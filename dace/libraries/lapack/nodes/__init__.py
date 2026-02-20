@@ -2,4 +2,5 @@
 from .getrf import Getrf
 from .getri import Getri
 from .getrs import Getrs
+from .gesvd import Gesvd
 from .potrf import Potrf
