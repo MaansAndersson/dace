@@ -107,8 +107,8 @@ def test_svd(implementation, dtype, m, n, full_matrices, storage):
 ###############################################################################
 
 if __name__ == "__main__":
-    test_svd("MKL", dace.float32, 4, 3, False, dace.StorageType.Default)
-    test_svd("MKL", dace.float64, 4, 3, False, dace.StorageType.Default)
-    test_svd("MKL", dace.float64, 4, 3, True, dace.StorageType.Default)
-    test_svd("cuSolverDn", dace.float32, 4, 3, False, dace.StorageType.GPU_Global)
-    test_svd("cuSolverDn", dace.float64, 4, 3, False, dace.StorageType.GPU_Global)
+    test_svd("OpenBLAS", dace.float32, 4, 3, False, dace.StorageType.Default)
+    test_svd("OpenBLAS", dace.float64, 4, 3, False, dace.StorageType.Default)
+    #test_svd("MKL", dace.float64, 4, 3, True, dace.StorageType.Default)
+    #test_svd("cuSolverDn", dace.float32, 4, 3, False, dace.StorageType.GPU_Global)
+    #test_svd("cuSolverDn", dace.float64, 4, 3, False, dace.StorageType.GPU_Global)

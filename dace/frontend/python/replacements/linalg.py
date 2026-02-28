@@ -248,6 +248,31 @@ def _inv(pv: ProgramVisitor, sdfg: SDFG, state: SDFGState, inp_op: str):
     return out_arr[0]
 
 
+@oprepo.replaces('dace.linalg.svd')
+@oprepo.replaces('numpy.linalg.svd')
+def _svd(pv: ProgramVisitor, sdfg: SDFG, state: SDFGState, inp_op: str):
+
+    if not isinstance(inp_op, str) or not inp_op in sdfg.arrays.keys():
+        raise SyntaxError()
+
+    inp_arr = sdfg.arrays[inp_op]
+    #out_arr = pv.add_temp_transient(inp_arr.shape, inp_arr.dtype, storage=inp_arr.storage)
+
+    from dace.libraries.linalg import Svd
+
+    inp = state.add_read(inp_op)
+    out = state.add_write(out_arr[0])
+    svd_node = Svd("Svd")  #, ...=True)
+
+    state.add_memlet_path(inp, svd_node, dst_conn="_a", memlet=Memlet.from_array(inp_op))
+    state.add_memlet_path(svd_node, out, src_conn="_b", memlet=Memlet.from_array(*out_u, *out_s, *out_vt))
+
+    return out_arr[0]
+
+
+## TODO: QR
+
+
 @oprepo.replaces('dace.tensordot')
 @oprepo.replaces('numpy.tensordot')
 def _tensordot(pv: 'ProgramVisitor',

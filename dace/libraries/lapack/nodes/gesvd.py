@@ -43,8 +43,8 @@ class ExpandGesvdOpenBLAS(ExpandTransformation):
         if desc_a.dtype.veclen > 1:
             raise (NotImplementedError)
 
-        jobu = "'F'" if node.full_matrices else "'S'"
-        jobvt = "'F'" if node.full_matrices else "'S'"
+        jobu = "'A'" if node.full_matrices else "'S'"
+        jobvt = "'A'" if node.full_matrices else "'S'"
 
         m = rows_a
         n = cols_a
@@ -53,7 +53,7 @@ class ExpandGesvdOpenBLAS(ExpandTransformation):
         ldu = m if node.full_matrices else m
         ldvt = n if node.full_matrices else min_mn
 
-        code = f"_res = LAPACKE_{lapack_dtype}gesdd(LAPACK_ROW_MAJOR, {jobu}, {jobvt}, {m}, {n}, {cast}_xin, {lda}, _s, _u, {ldu}, _vt, {ldvt});"
+        code = f"_res = LAPACKE_{lapack_dtype}gesdd(LAPACK_ROW_MAJOR, {jobu}, {m}, {n}, {cast}_xin, {lda}, _s, _u, {ldu}, _vt, {ldvt});"
         tasklet = dace.sdfg.nodes.Tasklet(node.name,
                                           node.in_connectors,
                                           node.out_connectors,
@@ -81,8 +81,8 @@ class ExpandGesvdMKL(ExpandTransformation):
         if desc_a.dtype.veclen > 1:
             raise (NotImplementedError)
 
-        jobu = "'F'" if node.full_matrices else "'S'"
-        jobvt = "'F'" if node.full_matrices else "'S'"
+        jobu = "'A'" if node.full_matrices else "'S'"
+        jobvt = "'A'" if node.full_matrices else "'S'"
 
         m = rows_a
         n = cols_a
@@ -164,7 +164,7 @@ class Gesvd(dace.sdfg.nodes.LibraryNode):
     implementations = {"OpenBLAS": ExpandGesvdOpenBLAS, "MKL": ExpandGesvdMKL, "cuSolverDn": ExpandGesvdCuSolverDn}
     default_implementation = None
 
-    full_matrices = dace.properties.Property(dtype=bool, default=False)
+    full_matrices = dace.properties.Property(dtype=bool, default=True)
 
     def __init__(self, name, full_matrices=False, *args, **kwargs):
         super().__init__(name, *args, inputs={"_xin"}, outputs={"_s", "_u", "_vt", "_res"}, **kwargs)
