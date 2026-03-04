@@ -32,7 +32,7 @@ class ExpandGesvdOpenBLAS(ExpandTransformation):
     @staticmethod
     def expansion(node, parent_state, parent_sdfg, n=None, **kwargs):
         (desc_a, stride_a, rows_a,
-         cols_a), desc_s, desc_u, desc_vt, desc_result = node.validate(parent_sdfg, parent_state)
+         cols_a), (desc_s, desc_u, desc_vt), desc_result = node.validate(parent_sdfg, parent_state)
         dtype = desc_a.dtype.base_type
         lapack_dtype = blas_helpers.to_blastype(dtype.type).lower()
         cast = ""
@@ -61,7 +61,7 @@ class ExpandGesvdOpenBLAS(ExpandTransformation):
                                           language=dace.dtypes.Language.CPP)
         return tasklet
 
-
+# Note MKL is not implement yet.
 @dace.library.expansion
 class ExpandGesvdMKL(ExpandTransformation):
 
@@ -70,7 +70,7 @@ class ExpandGesvdMKL(ExpandTransformation):
     @staticmethod
     def expansion(node, parent_state, parent_sdfg, n=None, **kwargs):
         (desc_a, stride_a, rows_a,
-         cols_a), desc_s, desc_u, desc_vt, desc_result = node.validate(parent_sdfg, parent_state)
+         cols_a), (desc_s, desc_u, desc_vt), desc_result = node.validate(parent_sdfg, parent_state)
         dtype = desc_a.dtype.base_type
         lapack_dtype = blas_helpers.to_blastype(dtype.type).lower()
         cast = ""
@@ -108,7 +108,7 @@ class ExpandGesvdCuSolverDn(ExpandTransformation):
     @staticmethod
     def expansion(node, parent_state, parent_sdfg, n=None, **kwargs):
         (desc_a, stride_a, rows_a,
-         cols_a), desc_s, desc_u, desc_vt, desc_result = node.validate(parent_sdfg, parent_state)
+         cols_a), (desc_s, desc_u, desc_vt), desc_result = node.validate(parent_sdfg, parent_state)
         dtype = desc_a.dtype.base_type
         veclen = desc_a.dtype.veclen
 
@@ -119,8 +119,8 @@ class ExpandGesvdCuSolverDn(ExpandTransformation):
         n = cols_a
         min_mn = min(m, n)
 
-        jobu = "CUSOLVER_SIDE_LEFT_ALL" if node.full_matrices else "CUSOLVER_SIDE_LEFT"
-        jobvt = "CUSOLVER_SIDE_RIGHT_ALL" if node.full_matrices else "CUSOLVER_SIDE_RIGHT"
+        jobu = "'S'" if node.full_matrices else "'A'"
+        jobvt = "'S'" if node.full_matrices else "'A'"
 
         if veclen != 1:
             raise (NotImplementedError)
@@ -128,21 +128,16 @@ class ExpandGesvdCuSolverDn(ExpandTransformation):
         code = (environments.cusolverdn.cuSolverDn.handle_setup_code(node) + f"""
                 int __dace_workspace_size = 0;
                 {cuda_type}* __dace_workspace;
-                cusolverDn{func}BufferSize(
-                    __dace_cusolverDn_handle, {jobu}, {jobvt}, {m}, {n}, {cuda_type}*,
-                    {stride_a}, {cuda_type}*,
-                    {cuda_type}*,
-                    {cuda_type}*,
-                    {cuda_type}*,
-                    &__dace_workspace_size);
+                cusolverDn{func}_bufferSize(
+                    __dace_cusolverDn_handle, {m}, {n}, &__dace_workspace_size);
                 cudaMalloc<{cuda_type}>(
                     &__dace_workspace,
                     sizeof({cuda_type}) * __dace_workspace_size);
                 cusolverDn{func}(
                     __dace_cusolverDn_handle, {jobu}, {jobvt}, {m}, {n}, ({cuda_type}*)_xin,
-                    {stride_a}, _s, _u,
-                    {m}, _vt,
-                    {min_mn}, __dace_workspace, __dace_workspace_size, _res);
+                    {stride_a}, ({cuda_type}*)_s, ({cuda_type}*)_u,
+                    {m}, ({cuda_type}*)_vt,
+                    {min_mn}, __dace_workspace, __dace_workspace_size, nullptr, _res);
                 cudaFree(__dace_workspace);
                 """)
 
@@ -196,6 +191,8 @@ class Gesvd(dace.sdfg.nodes.LibraryNode):
                 desc_vt = sdfg.arrays[e.data.data]
             if e.src_conn == "_result":
                 desc_res = sdfg.arrays[e.data.data]
+            #if e.dst_conn == "_ipiv":
+            #    desc_ipiv = sdfg.arrays[e.data.data]
 
         if desc_a.dtype.base_type != desc_s.dtype.base_type:
             raise ValueError("Basetype of input and singular values must be equal!")
@@ -203,6 +200,8 @@ class Gesvd(dace.sdfg.nodes.LibraryNode):
             raise ValueError("Basetype of input and U must be equal!")
         if desc_a.dtype.base_type != desc_vt.dtype.base_type:
             raise ValueError("Basetype of input and VT must be equal!")
+        #if desc_ipiv.dtype.base_type != dace.dtypes.int32:
+        #    raise ValueError("Pivot input must be an integer array!")
 
         stride_a = desc_a.strides[sqdims1[0]]
         shape_a = squeezed1.size()
@@ -213,4 +212,4 @@ class Gesvd(dace.sdfg.nodes.LibraryNode):
         if len(squeezed1.size()) != 2:
             raise ValueError("gesvd only supported on 2-dimensional arrays")
 
-        return (desc_a, stride_a, m, n), desc_s, desc_u, desc_vt, desc_res
+        return (desc_a, stride_a, m, n), (desc_s, desc_u, desc_vt), desc_res
